@@ -23,6 +23,8 @@ import java.util.concurrent.TimeUnit;
 
 import com.alibaba.csp.sentinel.dashboard.auth.AuthAction;
 import com.alibaba.csp.sentinel.dashboard.auth.AuthService.PrivilegeType;
+import com.alibaba.csp.sentinel.dashboard.nacos.FlowRuleNacosPublisher;
+import com.alibaba.csp.sentinel.dashboard.nacos.NacosConfig;
 import com.alibaba.csp.sentinel.util.StringUtil;
 
 import com.alibaba.csp.sentinel.dashboard.client.SentinelApiClient;
@@ -60,6 +62,13 @@ public class FlowControllerV1 {
 
     @Autowired
     private SentinelApiClient sentinelApiClient;
+
+    @Autowired
+    private NacosConfig nacosConfig;
+
+    @Autowired
+    private FlowRuleNacosPublisher flowRuleNacosPublisher;
+
 
     @GetMapping("/rules")
     @AuthAction(PrivilegeType.READ_RULE)
@@ -266,8 +275,11 @@ public class FlowControllerV1 {
         }
     }
 
-    private CompletableFuture<Void> publishRules(String app, String ip, Integer port) {
+    private CompletableFuture<Void> publishRules(String app, String ip, Integer port) throws Exception {
         List<FlowRuleEntity> rules = repository.findAllByMachine(MachineInfo.of(app, ip, port));
+        if(nacosConfig.isEnable()){
+            flowRuleNacosPublisher.publish(app,rules);
+        }
         return sentinelApiClient.setFlowRuleOfMachineAsync(app, ip, port, rules);
     }
 }

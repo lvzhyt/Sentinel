@@ -28,6 +28,9 @@ import com.alibaba.csp.sentinel.dashboard.discovery.AppManagement;
 import com.alibaba.csp.sentinel.dashboard.discovery.MachineInfo;
 import com.alibaba.csp.sentinel.dashboard.auth.AuthService;
 import com.alibaba.csp.sentinel.dashboard.auth.AuthService.PrivilegeType;
+import com.alibaba.csp.sentinel.dashboard.nacos.FlowRuleNacosPublisher;
+import com.alibaba.csp.sentinel.dashboard.nacos.NacosConfig;
+import com.alibaba.csp.sentinel.dashboard.nacos.ParamFlowRuleNacosPublisher;
 import com.alibaba.csp.sentinel.slots.block.RuleConstant;
 import com.alibaba.csp.sentinel.util.StringUtil;
 import com.alibaba.csp.sentinel.dashboard.datasource.entity.SentinelVersion;
@@ -65,6 +68,13 @@ public class ParamFlowRuleController {
     private AppManagement appManagement;
     @Autowired
     private RuleRepository<ParamFlowRuleEntity, Long> repository;
+
+    @Autowired
+    private NacosConfig nacosConfig;
+
+    @Autowired
+    private ParamFlowRuleNacosPublisher paramFlowRuleNacosPublisher;
+
 
     private boolean checkIfSupported(String app, String ip, int port) {
         try {
@@ -255,8 +265,11 @@ public class ParamFlowRuleController {
         }
     }
 
-    private CompletableFuture<Void> publishRules(String app, String ip, Integer port) {
+    private CompletableFuture<Void> publishRules(String app, String ip, Integer port) throws Exception {
         List<ParamFlowRuleEntity> rules = repository.findAllByMachine(MachineInfo.of(app, ip, port));
+        if(nacosConfig.isEnable()){
+            paramFlowRuleNacosPublisher.publish(app,rules);
+        }
         return sentinelApiClient.setParamFlowRuleOfMachine(app, ip, port, rules);
     }
 

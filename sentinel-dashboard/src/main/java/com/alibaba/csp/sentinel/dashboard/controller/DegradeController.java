@@ -22,6 +22,9 @@ import com.alibaba.csp.sentinel.dashboard.auth.AuthAction;
 import com.alibaba.csp.sentinel.dashboard.client.SentinelApiClient;
 import com.alibaba.csp.sentinel.dashboard.discovery.MachineInfo;
 import com.alibaba.csp.sentinel.dashboard.auth.AuthService.PrivilegeType;
+import com.alibaba.csp.sentinel.dashboard.nacos.DegradeRuleNacosPublisher;
+import com.alibaba.csp.sentinel.dashboard.nacos.FlowRuleNacosPublisher;
+import com.alibaba.csp.sentinel.dashboard.nacos.NacosConfig;
 import com.alibaba.csp.sentinel.slots.block.RuleConstant;
 import com.alibaba.csp.sentinel.util.StringUtil;
 
@@ -50,6 +53,13 @@ public class DegradeController {
     private InMemDegradeRuleStore repository;
     @Autowired
     private SentinelApiClient sentinelApiClient;
+
+    @Autowired
+    private NacosConfig nacosConfig;
+
+    @Autowired
+    private DegradeRuleNacosPublisher degradeRuleNacosPublisher;
+
 
     @ResponseBody
     @RequestMapping("/rules.json")
@@ -209,6 +219,14 @@ public class DegradeController {
 
     private boolean publishRules(String app, String ip, Integer port) {
         List<DegradeRuleEntity> rules = repository.findAllByMachine(MachineInfo.of(app, ip, port));
+        if(nacosConfig.isEnable()){
+            try {
+                degradeRuleNacosPublisher.publish(app,rules);
+            } catch (Exception e) {
+                logger.error("publishRules failed. ",e);
+                return false;
+            }
+        }
         return sentinelApiClient.setDegradeRuleOfMachine(app, ip, port, rules);
     }
 }
